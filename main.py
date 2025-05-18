@@ -945,13 +945,16 @@ class ServisGirisiEkleDialog(QDialog):
         islem_giris_layout = QGridLayout()
         islem_giris_group.setLayout(islem_giris_layout)
         islem_giris_layout.addWidget(QLabel('İşlem Açıklaması'), 0, 0)
-        islem_giris_layout.addWidget(QLineEdit(), 0, 1)
+        self.islem_aciklamasi_edit = QLineEdit()
+        islem_giris_layout.addWidget(self.islem_aciklamasi_edit, 0, 1)
         islem_giris_layout.addWidget(QLabel('İşlem Tutarı'), 0, 2)
-        islem_giris_layout.addWidget(QLineEdit(), 0, 3)
+        self.islem_tutari_edit = QLineEdit()
+        islem_giris_layout.addWidget(self.islem_tutari_edit, 0, 3)
         islem_giris_layout.addWidget(QLabel('Açıklama'), 0, 4)
-        islem_giris_layout.addWidget(QLineEdit(), 0, 5)
-        btn_ekle = QPushButton('Ekle')
-        islem_giris_layout.addWidget(btn_ekle, 0, 6)
+        self.islem_notu_edit = QLineEdit()
+        islem_giris_layout.addWidget(self.islem_notu_edit, 0, 5)
+        self.btn_islem_ekle = QPushButton('Ekle')
+        islem_giris_layout.addWidget(self.btn_islem_ekle, 0, 6)
         sag_layout.addWidget(islem_giris_group)
 
         # İşlem Listesi
@@ -972,34 +975,39 @@ class ServisGirisiEkleDialog(QDialog):
         ozet_group.setLayout(ozet_layout)
         ozet_layout.addWidget(QLabel('İşlem Özeti'), 0, 0, 1, 2)
         ozet_layout.addWidget(QLabel('Toplam İşlem Sayısı'), 1, 0)
-        toplam_islem = QLabel('0')
-        toplam_islem.setStyleSheet('background: #ffffcc;')
-        ozet_layout.addWidget(toplam_islem, 1, 1)
+        self.lbl_toplam_islem = QLabel('0')
+        self.lbl_toplam_islem.setStyleSheet('background: #ffffcc;')
+        ozet_layout.addWidget(self.lbl_toplam_islem, 1, 1)
         ozet_layout.addWidget(QLabel('Toplam İşlem Tutarı'), 2, 0)
-        toplam_tutar = QLabel('0,00')
-        toplam_tutar.setStyleSheet('background: #ccffcc;')
-        ozet_layout.addWidget(toplam_tutar, 2, 1)
+        self.lbl_toplam_tutar = QLabel('0,00')
+        self.lbl_toplam_tutar.setStyleSheet('background: #ccffcc;')
+        ozet_layout.addWidget(self.lbl_toplam_tutar, 2, 1)
         sag_layout.addWidget(ozet_group)
 
         # Alt butonlar
         alt_btn_layout = QHBoxLayout()
         alt_btn_layout.addStretch()
-        btn_olustur = QPushButton('EMRİ OLUŞTUR')
-        btn_temizle = QPushButton('İŞLEMLERİ TEMİZLE')
-        btn_pdf = QPushButton('PDF AKTAR')
-        btn_kapat = QPushButton('SAYFAYI KAPAT')
-        alt_btn_layout.addWidget(btn_olustur)
-        alt_btn_layout.addWidget(btn_temizle)
-        alt_btn_layout.addWidget(btn_pdf)
-        alt_btn_layout.addWidget(btn_kapat)
+        self.btn_emri_olustur = QPushButton('EMRİ OLUŞTUR')
+        self.btn_islemleri_temizle = QPushButton('İŞLEMLERİ TEMİZLE')
+        self.btn_pdf_aktar = QPushButton('PDF AKTAR')
+        self.btn_kapat = QPushButton('SAYFAYI KAPAT')
+        alt_btn_layout.addWidget(self.btn_emri_olustur)
+        alt_btn_layout.addWidget(self.btn_islemleri_temizle)
+        alt_btn_layout.addWidget(self.btn_pdf_aktar)
+        alt_btn_layout.addWidget(self.btn_kapat)
         sag_layout.addLayout(alt_btn_layout)
 
         ana_layout.addWidget(sag_widget, 3)
 
         self.setLayout(ana_layout)
-        btn_kapat.clicked.connect(self.reject)
+        self.btn_kapat.clicked.connect(self.reject)
         sec_btn1.clicked.connect(self.cari_sec)
         sec_btn2.clicked.connect(self.arac_sec)
+        
+        # İşlem butonlarını bağla
+        self.btn_islem_ekle.clicked.connect(self.islem_ekle)
+        self.btn_islemleri_temizle.clicked.connect(self.islemleri_temizle)
+        self.btn_emri_olustur.clicked.connect(self.servis_emri_olustur)
 
     def cari_sec(self):
         def on_cari_select(kod, ad, telefon, cari_tipi):
@@ -1053,6 +1061,97 @@ class ServisGirisiEkleDialog(QDialog):
             self.gecmis_table.setItem(row, 0, QTableWidgetItem(str(kayit[1])))  # tarih
             self.gecmis_table.setItem(row, 1, QTableWidgetItem(f"{float(kayit[2]):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')))  # tutar
             self.gecmis_table.setItem(row, 2, QTableWidgetItem(str(kayit[3])))  # durum
+
+    def islem_ekle(self):
+        """İşlem bilgilerini alıp listeye ekler ve tabloyu günceller"""
+        if not self.selected_plaka:
+            QMessageBox.warning(self, 'Uyarı', 'Lütfen önce bir araç seçin!')
+            return
+
+        aciklama = self.islem_aciklamasi_edit.text().strip()
+        tutar_str = self.islem_tutari_edit.text().strip().replace(',', '.')
+        notlar = self.islem_notu_edit.text().strip()
+
+        if not aciklama or not tutar_str:
+            QMessageBox.warning(self, 'Uyarı', 'İşlem Açıklaması ve Tutar boş olamaz!')
+            return
+
+        try:
+            tutar = float(tutar_str)
+        except ValueError:
+            QMessageBox.warning(self, 'Hata', 'Geçerli bir tutar giriniz!')
+            return
+
+        # İşlemi listeye ekle
+        self.islemler.append({'aciklama': aciklama, 'tutar': tutar, 'notlar': notlar})
+
+        # Giriş alanlarını temizle
+        self.islem_aciklamasi_edit.clear()
+        self.islem_tutari_edit.clear()
+        self.islem_notu_edit.clear()
+
+        # Tabloyu güncelle
+        self.islem_tablosunu_guncelle()
+
+    def islem_tablosunu_guncelle(self):
+        """İşlemler listesindeki verileri tabloya yansıtır ve özet bilgileri günceller"""
+        self.islem_table.setRowCount(len(self.islemler))
+        toplam_tutar = 0
+        for row, islem in enumerate(self.islemler):
+            self.islem_table.setItem(row, 0, QTableWidgetItem(islem['aciklama']))
+            self.islem_table.setItem(row, 1, QTableWidgetItem(f"{islem['tutar']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')))
+            self.islem_table.setItem(row, 2, QTableWidgetItem(islem['notlar']))
+            toplam_tutar += islem['tutar']
+
+        # Özet bilgileri güncelle
+        self.lbl_toplam_islem.setText(str(len(self.islemler)))
+        self.lbl_toplam_tutar.setText(f"{toplam_tutar:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+
+    def islemleri_temizle(self):
+        """İşlemler listesini ve tabloyu temizler"""
+        self.islemler = []
+        self.islem_tablosunu_guncelle()
+
+    def servis_emri_olustur(self):
+        """Servis emrini (kayıt ve işlemlerini) veritabanına kaydeder"""
+        if not self.selected_cari_kodu or not self.selected_plaka:
+            QMessageBox.warning(self, 'Uyarı', 'Lütfen önce cari ve araç seçin!')
+            return
+
+        if not self.islemler:
+            QMessageBox.warning(self, 'Uyarı', 'Lütfen en az bir işlem ekleyin!')
+            return
+
+        try:
+            # Aracın ID'sini al
+            arac_info = self.db.get_arac(self.selected_plaka)
+            if not arac_info:
+                QMessageBox.warning(self, 'Hata', 'Seçilen araç veritabanında bulunamadı!')
+                return
+            arac_id = arac_info[0] # Arac ID'si tuple'ın ilk elemanı
+
+            # Toplam tutarı hesapla
+            toplam_tutar = sum(item['tutar'] for item in self.islemler)
+
+            # Servis kaydını ekle (başlangıç durumu BEKLEMEDE)
+            tarih = QDate.currentDate().toString('yyyy-MM-dd')
+            servis_kayit_id = self.db.add_servis_kayit(arac_id, tarih, toplam_tutar, 'Açık') # Durum şimdilik açık, onay sonrası kapalı olacak
+            
+            if servis_kayit_id:
+                # İşlem detaylarını ekle
+                for islem in self.islemler:
+                    self.db.add_islem_detay(servis_kayit_id, islem['aciklama'], islem['tutar'], islem['notlar'])
+                
+                # Servis kaydının onay durumunu BEKLEMEDE olarak ayarla
+                self.db.update_servis_kayit_onay(servis_kayit_id, 'BEKLEMEDE')
+                
+                QMessageBox.information(self, 'Başarılı', 'Servis Emri başarıyla oluşturuldu ve Kayıt Kabul ekranına gönderildi!')
+                self.accept() # Dialogu kapat
+            else:
+                QMessageBox.warning(self, 'Hata', 'Servis Emri oluşturulurken bir hata oluştu!')
+
+        except Exception as e:
+            QMessageBox.warning(self, 'Hata', f'Bir hata oluştu: {str(e)}')
 
 class AracListesiDialog(QDialog):
     def __init__(self, parent=None):
