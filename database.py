@@ -159,9 +159,13 @@ class Database:
             return None
 
     def get_arac_by_cari(self, cari_kodu):
-        """Retrieves all vehicles for a given customer"""
+        """Seçili cariye ait araçları getirir"""
         try:
-            self.cursor.execute('SELECT * FROM arac WHERE cari_kodu = ?', (cari_kodu,))
+            self.cursor.execute('''
+                SELECT plaka, arac_tipi, model_yili, marka, model
+                FROM arac
+                WHERE cari_kodu = ?
+            ''', (cari_kodu,))
             return self.cursor.fetchall()
         except sqlite3.Error as e:
             print(f"Error getting vehicles by customer: {e}")
@@ -392,4 +396,70 @@ class Database:
             return self.cursor.fetchall()
         except sqlite3.Error as e:
             print(f"Error fetching pending service records: {e}")
+            return []
+
+    def get_all_araclar(self):
+        """Tüm araçları getirir"""
+        try:
+            self.cursor.execute('''
+                SELECT 
+                    c.cari_kodu,
+                    c.cari_adi,
+                    a.plaka,
+                    a.arac_tipi,
+                    a.model_yili,
+                    a.marka,
+                    a.model
+                FROM arac a
+                JOIN cari c ON a.cari_kodu = c.cari_kodu
+                ORDER BY c.cari_adi, a.plaka
+            ''')
+            return self.cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Error getting all vehicles: {e}")
+            return []
+
+    def get_odeme_hareketleri_by_date_range(self, start_date, end_date):
+        """Belirli tarih aralığındaki ödeme hareketlerini getirir"""
+        try:
+            self.cursor.execute('''
+                SELECT 
+                    a.plaka,
+                    a.arac_tipi,
+                    c.cari_kodu,
+                    c.cari_adi,
+                    c.telefon,
+                    oh.tarih,
+                    oh.tutar
+                FROM odeme_hareketleri oh
+                JOIN cari c ON oh.cari_kodu = c.cari_kodu
+                JOIN arac a ON c.cari_kodu = a.cari_kodu
+                WHERE oh.tarih BETWEEN ? AND ?
+                ORDER BY oh.tarih DESC
+            ''', (start_date, end_date))
+            return self.cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Error getting payment transactions by date range: {e}")
+            return []
+
+    def get_arac_gecmisi(self):
+        """Araç geçmişini getirir"""
+        try:
+            self.cursor.execute('''
+                SELECT 
+                    a.plaka,
+                    a.marka,
+                    a.model,
+                    c.cari_adi,
+                    MAX(sk.tarih) as son_servis_tarihi,
+                    COUNT(sk.id) as toplam_servis_sayisi
+                FROM arac a
+                JOIN cari c ON a.cari_kodu = c.cari_kodu
+                LEFT JOIN servis_kayitlari sk ON a.id = sk.arac_id
+                GROUP BY a.plaka, a.marka, a.model, c.cari_adi
+                ORDER BY son_servis_tarihi DESC
+            ''')
+            return self.cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Error getting vehicle history: {e}")
             return [] 
